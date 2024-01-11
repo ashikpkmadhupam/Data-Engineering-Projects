@@ -5,8 +5,8 @@ Implement Complete Data Pipeline Data Engineering Project using RAPID Api
 * Adding trigger to run the extraction automatically 
 * Writing transformation function
 * Building automated trigger on transformation function 
-* Store files on S3 properly
-* Building Analytics Tables on data files using Glue and Athena
+* Store transformed files on S3
+* Using Snowpipe auto ingest the transformed data to SNowflake
 
 ## Steps for Creating AWS Lambda Layers using AWS Cloud9
 
