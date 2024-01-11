@@ -1,0 +1,79 @@
+--Create Database
+
+CREATE DATABASE CURRENCY_EXCHANGE;
+
+--Create Schema for AWS Connections
+
+CREATE SCHEMA CURRENCY_EXCHANGE.AWS_STAGE;
+
+--Create Schema for Table data
+
+CREATE SCHEMA CURRENCY_EXCHANGE.DATA;
+
+--Create Schema for File formats
+
+CREATE SCHEMA CURRENCY_EXCHANGE.FILE_FORMAT;
+
+
+--Create Schema for File formats
+
+CREATE FILE FORMAT CURRENCY_EXCHANGE.FILE_FORMAT.CSV
+    TYPE = 'CSV'
+    FIELD_DELIMITER = ','
+    PARSE_HEADER = FALSE
+    SKIP_HEADER = 1
+    DATE_FORMAT = 'YYYY-MM-DD'
+    EMPTY_FIELD_AS_NULL = TRUE;
+DROP FILE FORMAT CURRENCY_EXCHANGE.FILE_FORMAT.CSV;
+--Create Storage Integration for S3 Connection
+
+CREATE STORAGE INTEGRATION S3_STORAGE_INT
+    TYPE = EXTERNAL_STAGE
+    STORAGE_PROVIDER = 'S3'
+    STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::609424115312:role/Snowflake_S3_ReadOnly_Role'
+    ENABLED = TRUE
+    STORAGE_ALLOWED_LOCATIONS = ('s3://currency-exchange-ashik');
+
+--Describe Storage Integration for STORAGE_AWS_EXTERNAL_ID and STORAGE_AWS_IAM_USER_ARN to update in S3
+DESC STORAGE INTEGRATION S3_STORAGE_INT;
+
+-- Create S3 Stage
+
+CREATE STAGE CURRENCY_EXCHANGE.AWS_STAGE.S3_STAGE
+    URL = 's3://currency-exchange-ashik/transformed_data'
+    STORAGE_INTEGRATION = S3_STORAGE_INT;
+
+-- List files using stage to test connection
+LIST @CURRENCY_EXCHANGE.AWS_STAGE.S3_STAGE;
+
+-- Create Table for storing exchange rates data
+
+CREATE TABLE CURRENCY_EXCHANGE.DATA.EXCHANGE_RATE (
+    from_currency varchar(3),
+    to_currency varchar(3),
+    rate DOUBLE,
+    date DATE
+
+) CLUSTER BY (date,from_currency);
+
+--copy data from S files to table
+COPY INTO CURRENCY_EXCHANGE.DATA.EXCHANGE_RATE 
+    FROM @CURRENCY_EXCHANGE.AWS_STAGE.S3_STAGE
+    FILE_FORMAT = CURRENCY_EXCHANGE.FILE_FORMAT.CSV;
+    
+--Check the inserted data
+SELECT * from CURRENCY_EXCHANGE.DATA.EXCHANGE_RATE  where date='2024-01-11';
+
+SELECT COUNT(*) from CURRENCY_EXCHANGE.DATA.EXCHANGE_RATE;
+
+
+--Create PIPE with Auto ingestion
+CREATE PIPE CURRENCY_EXCHANGE.AWS_STAGE.S3_PIPE
+    AUTO_INGEST = TRUE
+AS COPY INTO CURRENCY_EXCHANGE.DATA.EXCHANGE_RATE 
+    FROM @CURRENCY_EXCHANGE.AWS_STAGE.S3_STAGE
+    FILE_FORMAT = CURRENCY_EXCHANGE.FILE_FORMAT.CSV;
+
+--Describe PIE and Copy SQS ARN and update the same in S3 notification config
+DESC PIPE CURRENCY_EXCHANGE.AWS_STAGE.S3_PIPE;
+
